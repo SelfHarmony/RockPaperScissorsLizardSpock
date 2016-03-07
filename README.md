@@ -1,0 +1,2 @@
+# RockPaperScissorsLizardSpock
+Python RiceUnivercity hometask 
