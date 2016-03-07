@@ -1,0 +1,237 @@
+## This is an example rock-paper-scissors-lizard-Spock game
+##
+## Ideas for further improvement:
+##   1) change order of elements when they are displayed so that it
+##      corresponds to the name of the game;
+##   2) try to generalize the code even further, in order to make
+##      it possible to add even more elements, let's say up to 7 or 11,
+##      without changing in the code anything apart from name of new
+##      elements and links to their icons;
+##   3) make random generator more "spectacular" - check that when new
+##      weapons are selected they do not match previously selected one;
+##
+##
+## NB: while CodeSkulptor's Python implementation does not have 'sleep'
+## operation, it is not really needed, especially in gamedev, as whole
+## interpreter gets stalled during it. To implement shiny effects
+## and similar stuff, in CodeSkulptor you'd typically use timers.
+## Check them out at http://www.codeskulptor.org/docs.html#tabs-Graphics
+
+import math
+import random	
+
+from simplegui import create_frame
+# this is bad style, but there are so many of simplegui.load_imag here...
+# it's certainly better than writing code through Ctrl+C / Ctrl+V
+from simplegui import load_image as li
+
+weapons = ["rock", "Spock", "paper", "lizard", "scissors"]
+icons = {
+    'player' : {
+        'default' : [
+            li('http://cs628420.vk.me/v628420121/41168/FNxpb4uJ53c.jpg'), # rock
+            li('http://cs628420.vk.me/v628420121/41176/os-0EarwV9g.jpg'), # Spock
+            li('http://cs628420.vk.me/v628420121/41161/S2Z8rkYhGx4.jpg'), # paper
+            li('http://cs628420.vk.me/v628420121/4115a/LDBgxKbl0eY.jpg'), # lizard
+            li('http://cs628420.vk.me/v628420121/4116f/XxohhKcNlyA.jpg'), # scissors
+            ],
+        'chosen' : [
+            li('http://cs628420.vk.me/v628420121/4118b/4oQmPtaVhJ0.jpg'),
+            li('http://cs628420.vk.me/v628420121/41199/ySZxv0LyzEU.jpg'),
+            li('http://cs628420.vk.me/v628420121/41184/2ggmEI4P3bM.jpg'),
+            li('http://cs628420.vk.me/v628420121/4117d/sgYgmAesnRo.jpg'),
+            li('http://cs628420.vk.me/v628420121/41192/ydB_vL8tA5k.jpg'),
+            ]
+        },
+    'computer' : {
+        'default' : [
+            li('http://cs628420.vk.me/v628420121/412b6/OU2S_GEfjH8.jpg'),
+            li('http://cs628420.vk.me/v628420121/412c4/_w2kAc7TOK4.jpg'),
+            li('http://cs628420.vk.me/v628420121/412af/QIvpqd_MnVQ.jpg'),
+            li('http://cs628420.vk.me/v628420121/412a8/aPreqmAk5Pk.jpg'),
+            li('http://cs628420.vk.me/v628420121/412bd/6_G7j5KkeWg.jpg'),
+            ],
+        'chosen' : [
+            li('http://cs628420.vk.me/v628420121/412d9/nr1Pkp5eQbA.jpg'),
+            li('http://cs628420.vk.me/v628420121/412e7/5F652VNrK8w.jpg'),
+            li('http://cs628420.vk.me/v628420121/412d2/7tQm_Tp_byc.jpg'),
+            li('http://cs628420.vk.me/v628420121/412cb/YMMs_RYwdxY.jpg'),
+            li('http://cs628420.vk.me/v628420121/412e0/225usUC6Hsc.jpg'),
+            ]
+        }
+    }
+
+# another solution would be storing links to images in 'icons' as plain strings:
+#    ...
+#    'http://cs628420.vk.me/v628420121/41199/ySZxv0LyzEU.jpg',
+#    'http://cs628420.vk.me/v628420121/41184/2ggmEI4P3bM.jpg',
+#    ...
+# and load them with a nested loop:
+#
+#for i in ('player', 'computer'):
+#    for j in ('default', 'chosen'):
+#        for k in range(5):
+#        icons[i][j][k] = simplegui.load_image(icons[i][j][k])
+#
+# even better solution would be to combine all the images into single
+# tilemap/spritesheet: https://developer.mozilla.org/en-US/docs/Games/Techniques/Tilemaps
+
+imageWin = li('http://cs628420.vk.me/v628420121/41289/QgXIwQFiCLc.jpg') 
+imageLose = li('http://cs628420.vk.me/v628420121/41282/I0Ayrup0-A4.jpg') 
+imageTie = li('http://cs628420.vk.me/v628420121/4127b/UdL0tSI-xrQ.jpg') 
+
+# GUI INIT
+WIDTH = 500
+HEIGHT = 300
+grw = 100
+
+# State of the game
+# (these are the only global variables that will change)
+
+Winner = None
+
+# I'd prefer more uniform naming scheme, e.g. 'computer_choice' instead of
+# 'comp_number', but I guess this name was chosen by Coursera staff
+player_choice = None
+comp_number = None
+
+# helper function (some complicated math)
+def distance(p, q):
+    return math.sqrt((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2)
+
+def click1 (pos):
+    global player_choice, comp_number, Winner
+    # your original click detection
+    #
+    #for i in range(5):
+    #    if distance(pos, (grw * i + grw / 2, grw/2)) < grw / 2:
+    #        rpsls(number_to_name(i))
+    #        return
+    #
+    # I don't like this version that much, because it does not react to
+    # clicks close to corners, so there is version with rectangles (another
+    # advantage is that it does not need loop):
+    if (0 < pos[1] <= 100) and (0 < pos[0] <= 5 * grw):
+        n = pos[0] // grw
+        rpsls(number_to_name(n))
+        return
+    # if you don't want to count rounded (transparent) corners as click,
+    # you should combine those two aproaches and check that click fits in both
+    #   1) rectangle, as shown above, and
+    #   2) in circle, as you've done before, but this time it's radius should be
+    #      sufficiently big (I'd say 100 * sqrt(2) / 2 - delta)
+    # if function is still running, player has clicked outside of her icons
+    player_choice = None
+    comp_number = None
+    Winner = None
+        
+#let's draw our rpsls'       
+
+def draw_icon(canvas, who, where):
+    canvas.draw_image(who, (115 / 2, 115 / 2), (115, 115), where, (100, 100))
+    
+def draw_initial(canvas):
+    for i in range(5):
+        column = 50 + 100 * i
+        # draw player's icons
+        if i == player_choice:
+            icon = icons['player']['chosen'][i]
+        else:
+            icon = icons['player']['default'][i]
+        draw_icon(canvas, icon, (column, 50))
+
+        # draw computer's icons
+        if i == comp_number:
+            icon = icons['computer']['chosen'][i]
+        else:
+            icon = icons['computer']['default'][i]
+        draw_icon(canvas, icon, (column, 250))
+    #
+    # (if we were free to store player's and computer's choices say in an array,
+    #  we could draw all their icons in one go, and get away without copypasting)
+    #
+
+    # None acts as False in conditions, so this will try to draw image only if
+    # there is a Winner
+    if Winner:
+        canvas.draw_image(Winner, (300/2, 30/2), (300, 30), (250, 150), (300, 30))
+
+    canvas.draw_text("You", [240,110], 11, "black")
+    canvas.draw_text("Computer", [230,195], 11, "black")
+
+
+def button1win():
+    global comp_number, player_choice, Winner
+    # actually, the proper way to do this would be to add keyword argument to
+    # rpsls, so that if it gets called with additional parameter:
+    #   rpsls("rock", computer="scissors")
+    # this argument gets used instead of rolling a new random one
+    # but since keyword arguments haven't been introduced yet, let's do it
+    # this way (there won't be any output in console though)
+    comp_number = random.randrange(5)
+    player_choice = (comp_number + 1 + random.randrange(2)) % 5
+    Winner = imageWin
+
+# Here we start the main logic
+
+def name_to_number(name):
+    # I find checks like this clearer for future programmers, but another
+    # option is to use 'try' ... 'except' ( https://docs.python.org/2/tutorial/errors.html )
+    if name in weapons:
+        return weapons.index(name)
+    else:
+        print("error")
+        # again, true Python style would be to 'raise' an exception here
+        return -1
+        
+def number_to_name(digit):
+    # admittedly, you could skip these checks altogether, given how small
+    # the program is, but in general it's good maners to be as defensive
+    # as you can
+    if digit in range(len(weapons)):
+        return weapons[digit]
+    else: 
+        print "error"
+        return -1
+
+def rpsls(name):
+    global player_choice, comp_number, Winner
+
+    player_choice = name_to_number(name)
+    comp_number = random.randrange(0,5)    
+    difference = (player_choice - comp_number) % 5
+    comp_name = number_to_name(comp_number)
+
+    print "Player chooses", name
+    print "Computer chooses", comp_name
+
+    ## fun (but slightly more confusing) way to do the same as below:
+    #msgs = [("Player and Computer tie!", imageTie),
+    #        ("Player wins!", imageWin),
+    #        ("Computer wins!", imageLose)]
+    #message, Winner = msgs[math.ceil(difference / 2.0)][0], "\n")
+    #print (message, "\n")
+        
+    if difference in (1, 2):
+        print "Player wins!\n"
+        Winner = imageWin
+    elif difference in (3, 4):
+        print "Computer wins!\n"
+        Winner = imageLose
+    else:
+        print "Player and Computer tie!\n"
+        Winner = imageTie
+
+##########################################
+#FRAMES AND Main()    
+# create frame
+frame = create_frame("rock-paper-scissors-Spock-lizard", WIDTH, HEIGHT)
+frame.set_canvas_background("White")
+button1 = frame.add_button('INSTANT WIN', button1win)
+
+# register event handler
+frame.set_mouseclick_handler(click1)
+frame.set_draw_handler(draw_initial)
+
+# start frame
+frame.start()
